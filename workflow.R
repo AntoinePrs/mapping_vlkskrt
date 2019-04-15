@@ -144,11 +144,17 @@ see <- ggplot()+
 
 see
 
-cities$res <- mod$residuals
+ggsave("regression.png", see, "png")
 
-ggplot()+
+library(MASS)
+
+cities$res <- stdres(mod)
+
+res <- ggplot()+
   geom_sf(data=nbr, fill="white", size=.1)+
   geom_sf(data=st_union(map_1990), fill="gray97", size=.1)+
-  geom_point(data=cities, aes(x=lon, y=lat, color=res, size=log(freq)))+
+  geom_point(data=cities, aes(x=lon, y=lat, color=res, size=abs(res)))+
   scale_color_gradient2(high="red", mid="white", low = "blue", midpoint = 0)+
   coord_sf(xlim=c(3.3,7.1), ylim=c(50.8, 53.5), datum = NA)
+
+ggsave("res.png", res, "png")
