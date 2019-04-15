@@ -6,6 +6,8 @@ library(ggplot2)
 library(eurostat)
 library(knitr)
 library(ggspatial)
+library(ggrepel)
+library(MASS)
 
 
 #laod the dataset with volkskrant info
@@ -27,7 +29,7 @@ get_map <- function(year){
   library(geojsonsf)
   url <- paste("http://nlgis.nl/api/maps?year=", year, "&format=geojson", sep = "")
   mun <- geojson_sf(url)
-  mun$year <- year
+  mun$period <- paste0(year-5, "-", year+4)
   mun}
 
 #dowload one map for year period
@@ -38,7 +40,7 @@ for(i in census){
 
 #combine them into a single object to use them in with the ggplot function facet_wrap
 base_maps <- rbind(map_1960, map_1970, map_1980, map_1990)
-base_maps <- base_maps %>% group_by(year) %>%summarise()
+base_maps <- base_maps %>% group_by(period) %>%summarise()
 
 #get map of neighboring countries
 nbr <- get_eurostat_geospatial(output_class = "sf", resolution = "03", 
@@ -66,7 +68,7 @@ g <- ggplot()+
   scale_size_continuous(range=c(.1, 6), name = 'Relative freq.')+
   facet_wrap(~period)+
   theme(axis.title = element_blank())
-g
+#g
 #ggsave("map_facets.png", g, "png")
 
 #change between 1960 and 1990
@@ -91,7 +93,7 @@ g2 <- ggplot()+
   scale_size_continuous(range=c(.3,9), name = 'Rel. freq. 1990')+
   annotation_scale(height = unit(0.1, "cm"))
 #g2  
-ggsave("change.png", g2, "png")
+#ggsave("change.png", g2, "png")
 
 #top 10 increase
 data90 <- data90[order(data90$change, decreasing = T),]
@@ -129,25 +131,27 @@ cities <- cities %>% group_by(name, amsterdamcode, total)%>%
 
 cities <- cities[!is.na(cities$total),]
 
-#mod <- lm(freq~total, data=cities)
-#summary(mod)
+#correlation
+cor(cities$freq, cities$total)
 
+#linear model
 mod <- lm(log(freq)~log(total), data=cities)
-mod <- lm(freq~total, data=cities)
 summary(mod)
 
+#cities <- cities[order(cities$total, decreasing = T),]
+
 see <- ggplot()+
-  geom_point(data=cities, aes(x=total, y=freq))+
-  geom_smooth(data=cities, aes(x=total, y=freq), method = "lm")+
-  scale_x_log10()+
-  scale_y_log10()
+  geom_point(data=cities, aes(x=log(total), y=log(freq)))+
+  geom_smooth(data=cities, aes(x=log(total), y=log(freq)), method = "lm")+
+  labs(y="ln(Frequency)", x="ln(Population)")#+
+  #geom_text_repel(data=cities[1:10,], aes(x=log(total), y=log(freq), label=name), size=3)
 
 see
 
-ggsave("regression.png", see, "png")
+#ggsave("regression.png", see, "png")
 
-library(MASS)
 
+#mapping residuals
 cities$res <- stdres(mod)
 
 res <- ggplot()+
@@ -155,6 +159,11 @@ res <- ggplot()+
   geom_sf(data=st_union(map_1990), fill="gray97", size=.1)+
   geom_point(data=cities, aes(x=lon, y=lat, color=res, size=abs(res)))+
   scale_color_gradient2(high="red", mid="white", low = "blue", midpoint = 0)+
-  coord_sf(xlim=c(3.3,7.1), ylim=c(50.8, 53.5), datum = NA)
+  coord_sf(xlim=c(3.3,7.1), ylim=c(50.8, 53.5), datum = NA)+
+  theme(axis.title = element_blank())+
+  annotation_north_arrow(height = unit(0.5, "cm"), width = unit(0.5, "cm"), 
+                         location = "br")+
+  annotation_scale(height = unit(0.1, "cm"))
 
-ggsave("res.png", res, "png")
+#res
+#ggsave("res.png", res, "png")
